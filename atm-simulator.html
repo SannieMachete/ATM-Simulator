@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS ATM Simulation</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green: #00e676;
+    --green-dim: #00c853;
+    --green-glow: rgba(0,230,118,0.15);
+    --green-dark: #004d26;
+    --bg-deep: #0a0f0a;
+    --bg-panel: #111811;
+    --bg-card: #151d15;
+    --bg-input: #0d130d;
+    --border: rgba(0,230,118,0.2);
+    --border-bright: rgba(0,230,118,0.5);
+    --text-primary: #e8f5e9;
+    --text-secondary: #81c784;
+    --text-muted: #4caf50;
+    --red: #ef5350;
+    --amber: #ffa726;
+    --blue: #42a5f5;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg-deep);
+    font-family: var(--sans);
+    color: var(--text-primary);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+  }
+  .atm-wrap {
+    width: 100%;
+    max-width: 480px;
+    position: relative;
+  }
+  .atm-machine {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 0 40px rgba(0,230,118,0.08), inset 0 1px 0 rgba(0,230,118,0.1);
+  }
+  .atm-header {
+    background: var(--bg-deep);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .atm-logo {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--green);
+    letter-spacing: 3px;
+  }
+  .atm-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-family: var(--mono);
+  }
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .screen {
+    padding: 24px 24px 20px;
+    min-height: 360px;
+    display: flex;
+    flex-direction: column;
+  }
+  .screen-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .screen-heading {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+  }
+  .screen-sub {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 24px;
+  }
+  .balance-display {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin: 16px 0;
+    text-align: center;
+  }
+  .balance-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+  }
+  .balance-amount {
+    font-family: var(--mono);
+    font-size: 36px;
+    color: var(--green);
+    text-shadow: 0 0 20px var(--green-glow);
+  }
+  .balance-currency {
+    font-size: 16px;
+    color: var(--text-secondary);
+    margin-right: 4px;
+  }
+  .field {
+    margin-bottom: 14px;
+  }
+  .field label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+    font-family: var(--mono);
+    letter-spacing: 1px;
+  }
+  .field input, .field select {
+    width: 100%;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 15px;
+    color: var(--text-primary);
+    font-family: var(--mono);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .field input:focus, .field select:focus {
+    border-color: var(--border-bright);
+    box-shadow: 0 0 0 3px var(--green-glow);
+  }
+  .field select option { background: var(--bg-panel); }
+  .pin-dots {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin: 20px 0;
+  }
+  .pin-dot {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    border: 2px solid var(--border-bright);
+    background: transparent;
+    transition: all 0.2s;
+  }
+  .pin-dot.filled {
+    background: var(--green);
+    border-color: var(--green);
+    box-shadow: 0 0 8px var(--green);
+  }
+  .numpad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .numpad-btn {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 8px;
+    font-family: var(--mono);
+    font-size: 18px;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+  }
+  .numpad-btn:hover { background: var(--bg-input); border-color: var(--border-bright); }
+  .numpad-btn:active { transform: scale(0.96); }
+  .numpad-btn.clear { color: var(--red); font-size: 14px; }
+  .numpad-btn.enter { color: var(--green); font-size: 13px; }
+  .btn {
+    display: block;
+    width: 100%;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    border: none;
+    font-family: var(--sans);
+    letter-spacing: 0.3px;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn-primary {
+    background: var(--green);
+    color: #000;
+  }
+  .btn-primary:hover { background: var(--green-dim); }
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+  }
+  .btn-ghost:hover { border-color: var(--border-bright); color: var(--text-primary); }
+  .btn-danger {
+    background: transparent;
+    border: 1px solid rgba(239,83,80,0.4);
+    color: var(--red);
+  }
+  .btn-danger:hover { background: rgba(239,83,80,0.08); }
+  .btn-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .menu-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 8px;
+  }
+  .menu-item {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+  }
+  .menu-item:hover { border-color: var(--border-bright); background: var(--bg-input); }
+  .menu-item-icon {
+    font-size: 22px;
+    margin-bottom: 10px;
+  }
+  .menu-item-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+  .menu-item-desc {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+    font-family: var(--mono);
+  }
+  .txn-list { flex: 1; overflow-y: auto; max-height: 280px; }
+  .txn-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 11px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    background: var(--bg-card);
+  }
+  .txn-left { display: flex; align-items: center; gap: 10px; }
+  .txn-icon {
+    width: 32px; height: 32px;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+  }
+  .txn-icon.dep { background: rgba(0,230,118,0.1); }
+  .txn-icon.with { background: rgba(239,83,80,0.1); }
+  .txn-icon.bal { background: rgba(66,165,245,0.1); }
+  .txn-label { font-size: 13px; font-weight: 500; }
+  .txn-time { font-size: 10px; color: var(--text-muted); font-family: var(--mono); margin-top: 1px; }
+  .txn-amount {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .txn-amount.pos { color: var(--green); }
+  .txn-amount.neg { color: var(--red); }
+  .txn-amount.neutral { color: var(--blue); }
+  .msg {
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin: 12px 0;
+    font-family: var(--mono);
+  }
+  .msg-success { background: rgba(0,230,118,0.08); border: 1px solid rgba(0,230,118,0.2); color: var(--green); }
+  .msg-error { background: rgba(239,83,80,0.08); border: 1px solid rgba(239,83,80,0.2); color: var(--red); }
+  .admin-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .admin-badge {
+    background: rgba(255,167,38,0.1);
+    border: 1px solid rgba(255,167,38,0.3);
+    color: var(--amber);
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    letter-spacing: 1px;
+  }
+  .account-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+  .account-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .account-name { font-size: 14px; font-weight: 500; }
+  .account-num { font-family: var(--mono); font-size: 10px; color: var(--text-muted); }
+  .account-balance { font-family: var(--mono); font-size: 16px; color: var(--green); }
+  .account-meta { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+  .spacer { flex: 1; }
+  .divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+  .receipt-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    text-align: center;
+    margin: 16px 0;
+  }
+  .receipt-icon { font-size: 36px; margin-bottom: 12px; }
+  .receipt-amount { font-family: var(--mono); font-size: 28px; color: var(--green); margin: 8px 0; }
+  .receipt-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    margin: 6px 0;
+    font-family: var(--mono);
+  }
+  .receipt-row span:first-child { color: var(--text-muted); }
+  .receipt-row span:last-child { color: var(--text-secondary); }
+  .atm-footer {
+    background: var(--bg-deep);
+    border-top: 1px solid var(--border);
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+  .scroll-bar::-webkit-scrollbar { width: 3px; }
+  .scroll-bar::-webkit-scrollbar-track { background: transparent; }
+  .scroll-bar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+  .tab {
+    flex: 1;
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-family: var(--mono);
+    transition: all 0.2s;
+    text-align: center;
+  }
+  .tab.active {
+    background: var(--green-glow);
+    border-color: var(--green);
+    color: var(--green);
+  }
+</style>
+</head>
+<body>
+<div class="atm-wrap">
+  <div class="atm-machine" id="app"></div>
+</div>
+
+<script>
+/* ─────────────────────────────────────────
+   In-memory database (replace with API/DB)
+───────────────────────────────────────── */
+const DB = {
+  accounts: [
+    { id:'ACC001', name:'Sarah Johnson', pin:'1234', balance:12450.75, email:'sarah@example.com', joined:'2023-01-15' },
+    { id:'ACC002', name:'Marcus Chen',   pin:'5678', balance:3820.00,  email:'marcus@example.com', joined:'2023-03-08' },
+    { id:'ACC003', name:'Priya Nair',    pin:'9012', balance:28100.50, email:'priya@example.com',  joined:'2022-11-02' },
+    { id:'ADMIN',  name:'Admin',         pin:'0000', balance:0,        email:'admin@atm.sys',      joined:'2022-01-01', isAdmin:true }
+  ],
+  transactions: [
+    { id:'T001', accountId:'ACC001', type:'deposit',    amount:5000, date:'2024-01-10 09:14', balance:12450.75 },
+    { id:'T002', accountId:'ACC001', type:'withdrawal', amount:200,  date:'2024-01-11 14:30', balance:12250.75 },
+    { id:'T003', accountId:'ACC001', type:'deposit',    amount:400,  date:'2024-01-12 10:05', balance:12650.75 },
+    { id:'T004', accountId:'ACC002', type:'withdrawal', amount:150,  date:'2024-01-10 16:22', balance:3820.00  },
+    { id:'T005', accountId:'ACC003', type:'deposit',    amount:10000,date:'2024-01-09 08:00', balance:28100.50 },
+  ]
+};
+
+/* ─────────────────────────────────────────
+   Application State
+───────────────────────────────────────── */
+let state = {
+  screen: 'welcome',
+  currentAccount: null,
+  pinInput: '',
+  amount: '',
+  message: '',
+  messageType: '',
+  receipt: null,
+  adminTab: 'accounts',
+  loginAttempts: 0
+};
+
+/* ─────────────────────────────────────────
+   Helpers
+───────────────────────────────────────── */
+function fmt(n) {
+  return 'R ' + Number(n).toLocaleString('en-ZA', { minimumFractionDigits:2, maximumFractionDigits:2 });
+}
+function now() {
+  return new Date().toLocaleString('en-GB', {
+    day:'2-digit', month:'2-digit', year:'numeric',
+    hour:'2-digit', minute:'2-digit'
+  });
+}
+function genId() { return 'T' + Date.now(); }
+
+/* ─────────────────────────────────────────
+   Business Logic
+───────────────────────────────────────── */
+function login(pin) {
+  const acc = DB.accounts.find(a => a.pin === pin);
+  if (!acc) return false;
+  state.currentAccount = acc;
+  return true;
+}
+
+function deposit(amount) {
+  const acc = DB.accounts.find(a => a.id === state.currentAccount.id);
+  acc.balance += amount;
+  state.currentAccount = acc;
+  DB.transactions.unshift({
+    id: genId(), accountId: acc.id, type: 'deposit',
+    amount, date: now(), balance: acc.balance
+  });
+}
+
+function withdraw(amount) {
+  const acc = DB.accounts.find(a => a.id === state.currentAccount.id);
+  if (amount > acc.balance) return false;
+  acc.balance -= amount;
+  state.currentAccount = acc;
+  DB.transactions.unshift({
+    id: genId(), accountId: acc.id, type: 'withdrawal',
+    amount, date: now(), balance: acc.balance
+  });
+  return true;
+}
+
+/* ─────────────────────────────────────────
+   Screen Renderers
+───────────────────────────────────────── */
+const screens = {
+
+  welcome() {
+    return `
+    <div class="atm-header">
+      <div class="atm-logo">◆ NEXUS ATM</div>
+      <div class="atm-status"><div class="status-dot"></div>ONLINE</div>
+    </div>
+    <div class="screen">
+      <div style="text-align:center; margin:auto 0;">
+        <div style="font-size:52px; margin-bottom:16px; opacity:0.8">🏧</div>
+        <div class="screen-title">Welcome</div>
+        <div class="screen-heading" style="text-align:center">NEXUS Banking</div>
+        <div class="screen-sub" style="text-align:center">Secure • Fast • Reliable</div>
+        <div style="margin-top:32px; display:flex; flex-direction:column; gap:10px;">
+          <button class="btn btn-primary" onclick="go('login')">Insert Card / Sign In</button>
+          <button class="btn btn-ghost" onclick="go('adminLogin')" style="font-size:12px">Admin Access</button>
+        </div>
+        <div style="margin-top:28px; font-family:var(--mono); font-size:10px; color:var(--text-muted); line-height:1.8">
+          Demo accounts: PIN 1234 · 5678 · 9012<br>Admin PIN: 0000
+        </div>
+      </div>
+    </div>
+    <div class="atm-footer"><span>NEXUS BANK PLC</span><span>${new Date().toLocaleDateString()}</span></div>`;
+  },
+
+  login() {
+    const dots = Array.from({length:4}, (_,i) =>
+      `<div class="pin-dot ${i < state.pinInput.length ? 'filled':''}"></div>`
+    ).join('');
+    return `
+    <div class="atm-header">
+      <div class="atm-logo">◆ NEXUS ATM</div>
+      <div class="atm-status"><div class="status-dot"></div>SECURE</div>
+    </div>
+    <div class="screen">
+      <div class="screen-title">Authentication</div>
+      <div class="screen-heading">Enter Your PIN</div>
+      <div class="screen-sub">4-digit PIN required</div>
+      ${state.message ? `<div class="msg msg-${state.messageType}">${state.message}</div>` : ''}
+      <div class="pin-dots">${dots}</div>
+      <div class="numpad">
+        ${[1,2,3,4,5,6,7,8,9].map(n =>
+          `<button class="numpad-btn" onclick="pinPress('${n}')">${n}</button>`
+        ).join('')}
+        <button class="numpad-btn clear" onclick="go('welcome')">✕ Back</button>
+        <button class="numpad-btn" onclick="pinPress('0')">0</button>
+        <button class="numpad-btn enter" onclick="pinSubmit()">Enter ⏎</button>
+      </div>
+    </div>
+    <div class="atm-footer"><span>🔒 Encrypted</span><span>Attempt: ${state.loginAttempts}/3</span></div>`;
+  },
+
+  adminLogin() {
+    const dots = Array.from({length:4}, (_,i) =>
+      `<div class="pin-dot ${i < state.pinInput.length ? 'filled':''}"></div>`
+    ).join('');
+    return `
+    <div class="atm-header">
+      <div class="atm-logo">◆ NEXUS ATM</div>
+      <div class="atm-status"><div class="status-dot"></div>ADMIN</div>
+    </div>
+    <div class="screen">
+      <div class="screen-title">Administrator</div>
+      <div class="screen-heading">Admin Login</div>
+      <div class="screen-sub">Enter admin PIN (0000)</div>
+      ${state.message ? `<div class="msg msg-${state.messageType}">${state.message}</div>` : ''}
+      <div class="pin-dots">${dots}</div>
+      <div class="numpad">
+        ${[1,2,3,4,5,6,7,8,9].map(n =>
+          `<button class="numpad-btn" onclick="adminPinPress('${n}')">${n}</button>`
+        ).join('')}
+        <button class="numpad-btn clear" onclick="go('welcome')">✕ Back</button>
+        <button class="numpad-btn" onclick="adminPinPress('0')">0</button>
+        <button class="numpad-btn enter" onclick="adminPinSubmit()">Enter ⏎</button>
+      </div>
+    </div>
+    <div class="atm-footer"><span>🔐 Admin Mode</span><span></span></div>`;
+  },
+
+  dashboard() {
+    const acc = state.currentAccount;
+    return `
+    <div class="atm-header">
+      <div class="atm-logo">◆ NEXUS ATM</div>
+      <div class="atm-status"><div class="status-dot"></div>${acc.id}</div>
+    </div>
+    <div class="screen">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+        <div>
+          <div class="screen-title">Welcome back</div>
+          <div style="font-size:18px; font-weight:600">${acc.name.split(' ')[0]}</div>
+        </div>
+        <div style="font-size:28px">👤</div>
+      </div>
+      <div class="balance-display">
+        <div class="balance-label">Available Balance</div>
+        <div class="balance-amount">
+          <span class="balance-currency">R</span>${Number(acc.balance).toLocaleString('en-ZA', {minimumFractionDigits:2})}
+        </div>
+      </div>
+      <div class="menu-grid">
+        <div class="menu-item" onclick="go('deposit')">
+          <div class="menu-item-icon">💳</div>
+          <div class="menu-item-label">Deposit</div>
+          <div class="menu-item-desc">Add funds</div>
+        </div>
+        <div class="menu-item" onclick="go('withdraw')">
+          <div class="menu-item-icon">💸</div>
+          <div class="menu-item-label">Withdraw</div>
+          <div class="menu-item-desc">Get cash</div>
+        </div>
+        <div class="menu-item" onclick="go('history')">
+          <div class="menu-item-icon">📋</div>
+          <div class="menu-item-label">History</div>
+          <div class="menu-item-desc">Transactions</div>
+        </div>
+        <div class="menu-item" onclick="logout()">
+          <div class="menu-item-icon" style="color:var(--red)">🔚</div>
+          <div class="menu-item-label" style="color:var(--red)">Sign Out</div>
+          <div class="menu-item-desc">End session</div>
+        </div>
+      </div>
+    </div>
+    <div class="atm-footer"><span>Session active</span><span>${now()}</span></div>`;
+  },
+
+  deposit() {
+    const quickAmounts = [200, 500, 1000, 2000, 5000, 10000];
+    return `
+    <div class="atm-header">
+      <div class="atm-logo">◆ DEPOSIT</div>
+      <div class="atm-status"><div class="status-dot"></div>SECURE</div>
+    </div>
+    <div class="screen">
+      <div class="screen-title">Transaction</div>
+      <div class="screen-heading">Make a Deposit</div>
+      <div class="screen-sub">Balance: ${fmt(state.currentAccount.balance)}</div>
+      ${state.message ? `<div class="msg msg-${state.messageType}">${state.message}</div>` : ''}
+      <div class="field">
+        <label>AMOUNT (ZAR)</label>
+        <input type="number" id="amount" placeholder="0.00" min="1"
+          value="${state.amount}" oninput="state.amount=this.value"
+          style="font-size:20px; padding:14px;">
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:16px;">
+        ${quickAmounts.map(a =>
+          `<button class="numpad-btn" style="font-size:12px; padding:10px 4px;"
+            onclick="setAmount(${a})">R${a.toLocaleString()}</button>`
+        ).join('')}
+      </div>
+      <div class="spacer"></div>
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="go('dashboard')">← Back</button>
+        <button class="btn btn-primary" onclick="doDeposit()">Deposit →</button>
+      </div>
+    </div>
+    <div class="atm-footer"><span>💳 Deposit</span><span>${state.currentAccount.id}</span></div>`;
+  },
+
+  withdraw() {
+    const quickAmounts = [100, 200, 500, 1000, 2000, 5000];
+    return `
+    <div class="atm-header">
+      <div class="atm-logo">◆ WITHDRAW</div>
+      <div class="atm-status"><div class="status-dot"></div>SECURE</div>
+    </div>
+    <div class="screen">
+      <div class="screen-title">Transaction</div>
+      <div class="screen-heading">Cash Withdrawal</div>
+      <div class="screen-sub">Balance: ${fmt(state.currentAccount.balance)}</div>
+      ${state.message ? `<div class="msg msg-${state.messageType}">${state.message}</div>` : ''}
+      <div class="field">
+        <label>AMOUNT (ZAR)</label>
+        <input type="number" id="amount" placeholder="0.00" min="1"
+          value="${state.amount}" oninput="state.amount=this.value"
+          style="font-size:20px; padding:14px;">
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:16px;">
+        ${quickAmounts.map(a =>
+          `<button class="numpad-btn" style="font-size:12px; padding:10px 4px;"
+            onclick="setAmount(${a})">R${a.toLocaleString()}</button>`
+        ).join('')}
+      </div>
+      <div class="spacer"></div>
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="go('dashboard')">← Back</button>
+        <button class="btn btn-primary" onclick="doWithdraw()">Withdraw →</button>
+      </div>
+    </div>
+    <div class="atm-footer"><span>💸 Withdrawal</span><span>${state.currentAccount.id}</span></div>`;
+  },
+
+  receipt() {
+    const r = state.receipt;
+    const isDeposit = r.type === 'deposit';
+    return `
+    <div class="atm-header">
+      <div class="atm-logo">◆ RECEIPT</div>
+      <div class="atm-status"><div class="status-dot"></div>DONE</div>
+    </div>
+    <div class="screen">
+      <div class="receipt-box">
+        <div class="receipt-icon">${isDeposit ? '✅' : '💵'}</div>
+        <div style="font-size:12px; color:var(--text-muted); font-family:var(--mono)">
+          ${isDeposit ? 'DEPOSIT SUCCESSFUL' : 'WITHDRAWAL SUCCESSFUL'}
+        </div>
+        <div class="receipt-amount">${isDeposit ? '+' : '-'}${fmt(r.amount)}</div>
+        <hr class="divider">
+        <div class="receipt-row"><span>Account</span><span>${r.accountId}</span></div>
+        <div class="receipt-row"><span>Date / Time</span><span>${r.date}</span></div>
+        <div class="receipt-row"><span>Transaction ID</span><span>${r.id}</span></div>
+        <div class="receipt-row"><span>New Balance</span><span>${fmt(r.balance)}</span></div>
+      </div>
+      <div class="spacer"></div>
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="go('history')">View History</button>
+        <button class="btn btn-primary" onclick="go('dashboard')">Done ✓</button>
+      </div>
+    </div>
+    <div class="atm-footer"><span>Keep your receipt</span><span></span></div>`;
+  },
+
+  history() {
+    const txns = DB.transactions.filter(t => t.accountId === state.currentAccount.id);
+    const txnRows = txns.length === 0
+      ? `<div style="text-align:center; color:var(--text-muted); font-family:var(--mono);
+            font-size:12px; padding:30px 0">No transactions yet</div>`
+      : txns.map(t => {
+          const cls     = t.type === 'deposit' ? 'dep' : 'with';
+          const amtCls  = t.type === 'deposit' ? 'pos' : 'neg';
+          const sign    = t.type === 'deposit' ? '+' : '-';
+          const icon    = t.type === 'deposit' ? '⬇' : '⬆';
+          return `<div class="txn-item">
+            <div class="txn-left">
+              <div class="txn-icon ${cls}">${icon}</div>
+              <div>
+                <div class="txn-label">${t.type === 'deposit' ? 'Deposit' : 'Withdrawal'}</div>
+                <div class="txn-time">${t.date}</div>
+              </div>
+            </div>
+            <div>
+              <div class="txn-amount ${amtCls}">${sign}${fmt(t.amount)}</div>
+              <div style="font-size:10px; color:var(--text-muted); font-family:var(--mono);
+                text-align:right">Bal: ${fmt(t.balance)}</div>
+            </div>
+          </div>`;
+        }).join('');
+    return `
+    <div class="atm-header">
+      <div class="atm-logo">◆ HISTORY</div>
+      <div class="atm-status"><div class="status-dot"></div>${state.currentAccount.id}</div>
+    </div>
+    <div class="screen">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+        <div>
+          <div class="screen-title">Account</div>
+          <div style="font-size:16px; font-weight:600">Transactions</div>
+        </div>
+        <span style="font-family:var(--mono); font-size:11px; color:var(--text-muted)">${txns.length} records</span>
+      </div>
+      <div class="txn-list scroll-bar">${txnRows}</div>
+      <div class="spacer"></div>
+      <button class="btn btn-ghost" style="margin-top:12px" onclick="go('dashboard')">← Dashboard</button>
+    </div>
+    <div class="atm-footer"><span>Transaction history</span><span></span></div>`;
+  },
+
+  admin() {
+    const accounts       = DB.accounts.filter(a => !a.isAdmin);
+    const totalDeposits  = DB.transactions.filter(t => t.type === 'deposit').reduce((s,t) => s + t.amount, 0);
+    const totalWithdrawn = DB.transactions.filter(t => t.type === 'withdrawal').reduce((s,t) => s + t.amount, 0);
+
+    const tabContent = state.adminTab === 'accounts'
+      ? `<div style="overflow-y:auto; max-height:280px" class="scroll-bar">
+          ${accounts.map(a => `
+          <div class="account-card">
+            <div class="account-card-top">
+              <div>
+                <div class="account-name">${a.name}</div>
+                <div class="account-num">${a.id} · ${a.email}</div>
+              </div>
+              <div class="account-balance">${fmt(a.balance)}</div>
+            </div>
+            <div class="account-meta">Joined: ${a.joined} · PIN: ${'●'.repeat(4)}</div>
+          </div>`).join('')}
+        </div>`
+      : state.adminTab === 'txns'
+      ? `<div style="overflow-y:auto; max-height:280px" class="scroll-bar">
+          ${DB.transactions.map(t => `
+          <div class="txn-item">
+            <div class="txn-left">
+              <div class="txn-icon ${t.type === 'deposit' ? 'dep' : 'with'}">
+                ${t.type === 'deposit' ? '⬇' : '⬆'}
+              </div>
+              <div>
+                <div class="txn-label">${t.accountId} · ${t.type}</div>
+                <div class="txn-time">${t.date}</div>
+              </div>
+            </div>
+            <div class="txn-amount ${t.type === 'deposit' ? 'pos' : 'neg'}">
+              ${t.type === 'deposit' ? '+' : '-'}${fmt(t.amount)}
+            </div>
+          </div>`).join('')}
+        </div>`
+      : /* overview tab */
+        `<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
+          <div class="balance-display" style="margin:0">
+            <div class="balance-label">ACCOUNTS</div>
+            <div style="font-family:var(--mono); font-size:28px; color:var(--blue)">${accounts.length}</div>
+          </div>
+          <div class="balance-display" style="margin:0">
+            <div class="balance-label">TRANSACTIONS</div>
+            <div style="font-family:var(--mono); font-size:28px; color:var(--amber)">${DB.transactions.length}</div>
+          </div>
+          <div class="balance-display" style="margin:0">
+            <div class="balance-label">TOTAL DEPOSITS</div>
+            <div style="font-family:var(--mono); font-size:18px; color:var(--green)">${fmt(totalDeposits)}</div>
+          </div>
+          <div class="balance-display" style="margin:0">
+            <div class="balance-label">TOTAL WITHDRAWN</div>
+            <div style="font-family:var(--mono); font-size:18px; color:var(--red)">${fmt(totalWithdrawn)}</div>
+          </div>
+        </div>`;
+
+    return `
+    <div class="atm-header">
+      <div class="atm-logo">◆ ADMIN PANEL</div>
+      <div class="atm-status">
+        <div class="status-dot" style="background:var(--amber); box-shadow:0 0 6px var(--amber)"></div>ADMIN
+      </div>
+    </div>
+    <div class="screen">
+      <div class="admin-header">
+        <div>
+          <div class="screen-title">System</div>
+          <div style="font-size:16px; font-weight:600">Administration</div>
+        </div>
+        <div class="admin-badge">ADMIN</div>
+      </div>
+      <div class="tabs">
+        <button class="tab ${state.adminTab === 'overview' ? 'active' : ''}" onclick="setAdminTab('overview')">Overview</button>
+        <button class="tab ${state.adminTab === 'accounts' ? 'active' : ''}" onclick="setAdminTab('accounts')">Accounts</button>
+        <button class="tab ${state.adminTab === 'txns'     ? 'active' : ''}" onclick="setAdminTab('txns')">All Txns</button>
+      </div>
+      ${tabContent}
+      <div class="spacer"></div>
+      <button class="btn btn-danger" style="margin-top:12px" onclick="logout()">⏻ Sign Out Admin</button>
+    </div>
+    <div class="atm-footer"><span>Admin session</span><span>${now()}</span></div>`;
+  }
+};
+
+/* ─────────────────────────────────────────
+   Navigation & Rendering
+───────────────────────────────────────── */
+function render() {
+  document.getElementById('app').innerHTML = screens[state.screen]();
+}
+
+function go(screen) {
+  state.screen      = screen;
+  state.message     = '';
+  state.messageType = '';
+  if (screen !== 'login' && screen !== 'adminLogin') state.pinInput = '';
+  if (screen !== 'deposit' && screen !== 'withdraw')  state.amount  = '';
+  render();
+}
+
+/* ─────────────────────────────────────────
+   PIN Input Handlers
+───────────────────────────────────────── */
+function pinPress(n) {
+  if (state.pinInput.length < 4) { state.pinInput += n; render(); }
+}
+
+function adminPinPress(n) {
+  if (state.pinInput.length < 4) { state.pinInput += n; render(); }
+}
+
+function pinSubmit() {
+  if (state.pinInput.length !== 4) {
+    state.message = 'Please enter a 4-digit PIN';
+    state.messageType = 'error';
+    render(); return;
+  }
+  if (login(state.pinInput)) {
+    state.pinInput = '';
+    state.message  = '';
+    state.loginAttempts = 0;
+    state.screen = state.currentAccount.isAdmin ? 'admin' : 'dashboard';
+    render();
+  } else {
+    state.loginAttempts++;
+    state.pinInput = '';
+    if (state.loginAttempts >= 3) {
+      state.message = 'Card blocked. Too many failed attempts.';
+      state.messageType = 'error';
+      setTimeout(() => go('welcome'), 2500);
+    } else {
+      state.message = `Incorrect PIN. ${3 - state.loginAttempts} attempt(s) remaining.`;
+      state.messageType = 'error';
+    }
+    render();
+  }
+}
+
+function adminPinSubmit() {
+  if (state.pinInput.length !== 4) {
+    state.message = 'Please enter a 4-digit PIN';
+    state.messageType = 'error'; render(); return;
+  }
+  const acc = DB.accounts.find(a => a.isAdmin && a.pin === state.pinInput);
+  if (acc) {
+    state.currentAccount = acc;
+    state.screen = 'admin';
+    state.pinInput = '';
+    state.message  = '';
+    render();
+  } else {
+    state.pinInput = '';
+    state.message  = 'Invalid admin credentials.';
+    state.messageType = 'error';
+    render();
+  }
+}
+
+/* ─────────────────────────────────────────
+   Transaction Handlers
+───────────────────────────────────────── */
+function setAmount(a) {
+  state.amount = a;
+  render();
+}
+
+function doDeposit() {
+  const amt = parseFloat(state.amount);
+  if (!amt || amt <= 0) {
+    state.message = 'Please enter a valid amount';
+    state.messageType = 'error'; render(); return;
+  }
+  if (amt > 100000) {
+    state.message = 'Maximum single deposit is R100,000';
+    state.messageType = 'error'; render(); return;
+  }
+  deposit(amt);
+  state.receipt = DB.transactions[0];
+  state.amount  = '';
+  go('receipt');
+}
+
+function doWithdraw() {
+  const amt = parseFloat(state.amount);
+  if (!amt || amt <= 0) {
+    state.message = 'Please enter a valid amount';
+    state.messageType = 'error'; render(); return;
+  }
+  if (amt > state.currentAccount.balance) {
+    state.message = 'Insufficient funds';
+    state.messageType = 'error'; render(); return;
+  }
+  if (amt > 10000) {
+    state.message = 'Maximum single withdrawal is R10,000';
+    state.messageType = 'error'; render(); return;
+  }
+  if (!withdraw(amt)) {
+    state.message = 'Transaction declined';
+    state.messageType = 'error'; render(); return;
+  }
+  state.receipt = DB.transactions[0];
+  state.amount  = '';
+  go('receipt');
+}
+
+/* ─────────────────────────────────────────
+   Session & Admin Helpers
+───────────────────────────────────────── */
+function logout() {
+  state.currentAccount = null;
+  state.pinInput       = '';
+  state.amount         = '';
+  state.loginAttempts  = 0;
+  go('welcome');
+}
+
+function setAdminTab(tab) {
+  state.adminTab = tab;
+  render();
+}
+
+/* ─────────────────────────────────────────
+   Boot
+───────────────────────────────────────── */
+render();
+</script>
+</body>
+</html>
